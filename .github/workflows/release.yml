@@ -1,0 +1,89 @@
+name: Build and Release Contract
+
+on:
+  workflow_call:
+    inputs:
+      build_path:
+        description: 'JSON-encoded array of relative path to the contract directories'
+        type: string
+        required: true
+        default: '[""]'
+      release_name: 
+        description: 'Name for the release'
+        required: true
+        type: string
+      release_description:
+        description: 'Description for the release'
+        required: false
+        type: string
+    secrets:
+      release_token:
+        description: 'Github token'
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest 
+    strategy:
+      matrix:
+        directory: ${{ fromJson(inputs.build_path) }}
+    steps:
+      - name: Set build directory name
+        run: |
+          build_dir_name="build_${{ strategy.job-index }}"
+          echo "BUILD_DIR_NAME=$build_dir_name" >> $GITHUB_ENV
+          echo "BUILD_DIR_PATH=${{ github.workspace }}/$build_dir_name" >> $GITHUB_ENV
+
+      - name: Verify that checkout directory doesn't exist
+        run: |
+          if [[ -d ${{ env.BUILD_DIR_PATH }} ]]; then
+            echo "Directory ${{ env.BUILD_DIR_PATH }} already exists"
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.BUILD_DIR_NAME }}
+
+      - name: Run docker container
+        working-directory: ${{ env.BUILD_DIR_PATH }}
+        run: docker run --rm -e CONTRACT_DIR=${{ matrix.directory }} -v "${{ env.BUILD_DIR_PATH }}:/inspector/home" ghcr.io/stellar-expert/soroban-build-workflow:latest
+
+      - name: Get wasm file name
+        working-directory: ${{ env.BUILD_DIR_PATH }}
+        run: |
+          cd ${{ env.BUILD_DIR_PATH }}/release
+          wasm_file=$(find -type f -name "*.wasm")
+          cp $wasm_file ${{ env.BUILD_DIR_PATH }}
+          echo "WASM_FILE_NAME=$(basename $wasm_file)" >> $GITHUB_ENV  
+          echo "WASM_FILE_SHA256=$(sha256sum $wasm_file | cut -d ' ' -f 1)" >> $GITHUB_ENV 
+      
+      - name: Wasm file from directory "${{ matrix.directory }}" with hash ${{ env.WASM_FILE_SHA256 }} created
+        run: echo ${{ env.WASM_FILE_NAME }}
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.WASM_FILE_NAME }}
+          path: ${{ env.BUILD_DIR_PATH }}/release/${{ env.WASM_FILE_NAME }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+        
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_name }}
+          draft: false
+          prerelease: false
+          body: ${{ inputs.release_description }}
+          files: '**/*.wasm'
+          token: ${{ secrets.release_token }}
