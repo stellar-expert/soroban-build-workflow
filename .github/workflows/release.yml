@@ -28,11 +28,12 @@ jobs:
       matrix:
         directory: ${{ fromJson(inputs.build_path) }}
     steps:
-      - name: Set build directory name
+      - name: Set directory names and paths
         run: |
           build_dir_name="build_${{ strategy.job-index }}"
           echo "BUILD_DIR_NAME=$build_dir_name" >> $GITHUB_ENV
           echo "BUILD_DIR_PATH=${{ github.workspace }}/$build_dir_name" >> $GITHUB_ENV
+          echo "CONTRACT_DIR_NAME=${{ matrix.directory || '/' }}" >> $GITHUB_ENV
 
       - name: Verify that checkout directory doesn't exist
         run: |
@@ -59,7 +60,7 @@ jobs:
           echo "WASM_FILE_NAME=$(basename $wasm_file)" >> $GITHUB_ENV  
           echo "WASM_FILE_SHA256=$(sha256sum $wasm_file | cut -d ' ' -f 1)" >> $GITHUB_ENV 
       
-      - name: Wasm file from directory "${{ matrix.directory }}" with hash ${{ env.WASM_FILE_SHA256 }} created
+      - name: Compiled WASM ${{ env.WASM_FILE_SHA256 }} from ${{ env.CONTRACT_DIR_NAME }}
         run: echo ${{ env.WASM_FILE_NAME }}
       
       - name: Upload artifact
