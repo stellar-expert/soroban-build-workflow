@@ -7,6 +7,10 @@ on:
         description: 'Name for the release'
         required: true
         type: string
+      soroban_cli_version:
+        description: 'Soroban CLI version'
+        required: false
+        type: string
       
 permissions:
   contents: write
@@ -57,6 +61,8 @@ jobs:
       with:
         context: ./docker
         push: true  
+        build-args: |
+          SOROBAN_CLI_VERSION=${{ inputs.soroban_cli_version }}
         tags: |
           ghcr.io/${{ github.repository }}:${{ github.sha }}
           ghcr.io/${{ github.repository }}:${{ inputs.release_name }}
