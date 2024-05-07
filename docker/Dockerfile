@@ -19,6 +19,15 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 # Add Rust's cargo bin directory to your PATH
 ENV PATH="${PATH}:/root/.cargo/bin"
 
+# Define the version argument for rustc with a default value
+ARG RUST_VERSION=""
+
+# Install the specified version of rustc
+RUN if [ "$RUST_VERSION" ]; then \
+         rustup install "$RUST_VERSION"; \
+         rustup default "$RUST_VERSION"; \
+       fi
+
 # Install the wasm32-unknown-unknown target
 RUN rustup target add wasm32-unknown-unknown
 

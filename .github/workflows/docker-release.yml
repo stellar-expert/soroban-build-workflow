@@ -11,6 +11,10 @@ on:
         description: 'Soroban CLI version'
         required: false
         type: string
+      rust_version:
+        description: 'Rust version'
+        required: false
+        type: string
       
 permissions:
   contents: write
@@ -63,6 +67,7 @@ jobs:
         push: true  
         build-args: |
           SOROBAN_CLI_VERSION=${{ inputs.soroban_cli_version }}
+          RUST_VERSION=${{ inputs.rust_version }}
         tags: |
           ghcr.io/${{ github.repository }}:${{ github.sha }}
           ghcr.io/${{ github.repository }}:${{ inputs.release_name }}

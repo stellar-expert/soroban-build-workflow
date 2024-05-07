@@ -48,6 +48,8 @@ fi
 OUTPUT="${MOUNT_DIR}/$(uuidgen)"
 mkdir -p ${OUTPUT}
 
+
+
 # Get metadata
 CARGO_METADATA=$(cargo metadata --format-version=1 --no-deps)
 if [ $? -ne 0 ]; then
@@ -60,12 +62,10 @@ if [ "$PACKAGE" ]; then
     soroban contract build --package $PACKAGE --out-dir ${OUTPUT}
     # Set the package name to the provided package name
     PACKAGE_NAME=$PACKAGE
-    PACKAGE_VERSION=$(echo "$CARGO_METADATA" | jq '.packages[] | select(.name == "'"${PACKAGE_NAME}"'") | .version' | sed -e 's/"//g')
 else
-    soroban contract build --out-dir ${OUTPUT}
     # Get the package name from the Cargo.toml file
-    PACKAGE_NAME=$(grep -m1 '^name =' Cargo.toml | sed -E 's/^name = "(.*)"$/\1/')
-    PACKAGE_VERSION=$(grep -m1 '^version =' Cargo.toml | sed -E 's/^version = "(.*)"$/\1/')
+    PACKAGE_NAME=$(grep -m1 '^name =' Cargo.toml | cut -d '"' -f2)
+    soroban contract build --out-dir ${OUTPUT}
 fi
 
 # Verify that the build was successful
@@ -75,8 +75,15 @@ if [ $? -ne 0 ]; then
 fi
 
 # Verify that the package name and version were found
-if [ -z "$PACKAGE_NAME" ] || [ -z "$PACKAGE_VERSION" ]; then
-    echo "ERROR: Failed to get the package name and version"
+if [ -z "$PACKAGE_NAME" ]; then
+    echo "ERROR: Failed to get the package name"
+    exit 1
+fi
+
+# Get the package version
+PACKAGE_VERSION=$(echo "$CARGO_METADATA" | jq '.packages[] | select(.name == "'"${PACKAGE_NAME}"'") | .version' | sed -e 's/"//g')
+if [ -z "$PACKAGE_VERSION" ]; then
+    echo "ERROR: Failed to get the package version"
     exit 1
 fi
 
@@ -115,6 +122,26 @@ soroban contract optimize --wasm ${WASM_FILE_NAME} --wasm-out ${WASM_FILE_NAME}
 
 # Verify that the optimized.wasm file exists
 if [ ! -f "${RELEASE_DIR}/${WASM_FILE_NAME}" ]; then
-    echo "ERROR: optimized.wasm file does not exist"
+    echo "ERROR: wasm file doesn't exist"
     exit 1
 fi
+
+# Get the CLI version
+CLI_VERSION=$(soroban --version | grep -oP 'soroban \K\S+')
+
+# Calculate the SHA256 hash of the wasm file
+WASM_FILE_SHA256=$(sha256sum $wasm_file | cut -d ' ' -f 1)
+
+JSON_FILE="${RELEASE_DIR}/compilation_info.json"
+jq -n --arg PACKAGE_NAME "$PACKAGE_NAME" \
+       --arg PACKAGE_VERSION "$PACKAGE_VERSION" \
+       --arg CLI_VERSION "$CLI_VERSION" \
+       --arg WASM_FILE_NAME "$WASM_FILE_NAME" \
+       --arg WASM_FILE_SHA256 "$WASM_FILE_SHA256" \
+       '{ 
+            packageName: $PACKAGE_NAME, 
+            packageVersion: $PACKAGE_VERSION, 
+            cliVersion: $CLI_VERSION, 
+            wasmFileName: $WASM_FILE_NAME,
+            wasmHash: $WASM_FILE_SHA256
+       }' > "$JSON_FILE"
