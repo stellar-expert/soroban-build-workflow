@@ -13,7 +13,7 @@ When triggered, this workflow:
 ### Prerequisites
 
 - Create a GitHub Actions workflow file `.github/workflows/release.yml` in your repository.
-- Decide how the compliation workflow will be triggered. The recommended way is to configure workflow activation on git tag creation. This should simplify versioning and ensure unique release names.
+- Decide how the compilation workflow will be triggered. The recommended way is to configure workflow activation on git tag creation. This should simplify versioning and ensure unique release names.
 
 ### Workflow inputs and secrets
 
@@ -21,10 +21,10 @@ Basic compilation workflow path:
 `stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main`
 
 The workflow expects the following inputs in the `with` section:
-- `release_name` (required) - release name template that includes a release version variable, e.g. `${{ github.ref_name }}`
-- `package` (optional) - package name to build. Builds contract in working directory by default
-- `relative_path` (optional) - relative path to the contract source directory. Defaults to the repository root directory
-- `make_target` (optional) - make target to invoke. Not invoked by default. Useful for contracts with dependencies, that must be built before the main contract
+- `release_name` (required) - release name template (should include a release version variable, e.g. `${{ github.ref_name }}`)
+- `package` (optional) - package name to build, builds contract in working directory by default
+- `relative_path` (optional) - relative path to the contract source directory, defaults to the repository root directory
+- `make_target` (optional) - make target to invoke, empty by default (useful for contracts with dependencies that must be built before the main contract)
 
 ### Basic workflow for the reporisotry with a single contract
 
@@ -33,7 +33,7 @@ name: Build and Release  # name it whatever you like
 on:
   push: 
     tags:
-      - 'v*'  # triggered whenever a new tag (previxed with "v") is pushed to the repository
+      - 'v*'  # triggered whenever a new tag (prefixed with "v") is pushed to the repository
 jobs:
   release-contract-a:
     uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main
@@ -45,6 +45,16 @@ jobs:
       make_target: 'build-dependencies'             # make target to invoke
     secrets:  # the authentication token will be automatically created by GitHub
       release_token: ${{ secrets.GITHUB_TOKEN }}    # don't modify this line
+```
+
+### Workflow permissions
+
+In order to create a release, the workflow needs `contents: write` permission. Default workflow permissions for a repository can be found at
+"Settings"->"Actions"->"Workflow permissions". This workflow should work just fine with default settings ("Read and write permissions").
+Alternatively, it's possible to specify permissions in the `.github/workflows/release.yml` configuration file itself:
+```yaml
+permissions:
+  contents: write
 ```
 
 ### Building multiple contracts
