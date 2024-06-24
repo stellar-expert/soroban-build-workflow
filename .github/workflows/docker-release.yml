@@ -7,8 +7,8 @@ on:
         description: 'Name for the release'
         required: true
         type: string
-      soroban_cli_version:
-        description: 'Soroban CLI version'
+      stellar_cli_version:
+        description: 'Stellar CLI version'
         required: false
         type: string
       rust_version:
@@ -66,7 +66,7 @@ jobs:
         context: ./docker
         push: true  
         build-args: |
-          SOROBAN_CLI_VERSION=${{ inputs.soroban_cli_version }}
+          STELLAR_CLI_VERSION=${{ inputs.stellar_cli_version }}
           RUST_VERSION=${{ inputs.rust_version }}
         tags: |
           ghcr.io/${{ github.repository }}:${{ github.sha }}

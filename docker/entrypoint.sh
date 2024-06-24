@@ -35,8 +35,8 @@ rustc --version
 # Print Cargo version
 cargo --version
 
-# Print Soroban version
-soroban --version
+# Print Stellar version
+stellar --version
 
 # Check if the Cargo.toml file exists
 if [ ! -f "Cargo.toml" ]; then
@@ -59,13 +59,13 @@ fi
 
 # Check if the PACKAGE is defined add it to the build command
 if [ "$PACKAGE" ]; then
-    soroban contract build --package $PACKAGE --out-dir ${OUTPUT}
+    stellar contract build --package $PACKAGE --out-dir ${OUTPUT}
     # Set the package name to the provided package name
     PACKAGE_NAME=$PACKAGE
 else
     # Get the package name from the Cargo.toml file
     PACKAGE_NAME=$(grep -m1 '^name =' Cargo.toml | cut -d '"' -f2)
-    soroban contract build --out-dir ${OUTPUT}
+    stellar contract build --out-dir ${OUTPUT}
 fi
 
 # Verify that the build was successful
@@ -118,7 +118,7 @@ fi
 cd ${RELEASE_DIR}
 
 # Optimize the WASM file
-soroban contract optimize --wasm ${WASM_FILE_NAME} --wasm-out ${WASM_FILE_NAME}
+stellar contract optimize --wasm ${WASM_FILE_NAME} --wasm-out ${WASM_FILE_NAME}
 
 # Verify that the optimized.wasm file exists
 if [ ! -f "${RELEASE_DIR}/${WASM_FILE_NAME}" ]; then
@@ -127,7 +127,7 @@ if [ ! -f "${RELEASE_DIR}/${WASM_FILE_NAME}" ]; then
 fi
 
 # Get the CLI version
-CLI_VERSION=$(soroban --version | grep -oP 'soroban \K\S+')
+CLI_VERSION=$(stellar --version | grep -oP 'stellar \K\S+')
 
 # Calculate the SHA256 hash of the wasm file
 WASM_FILE_SHA256=$(sha256sum $WASM_FILE_NAME | cut -d ' ' -f 1)

@@ -31,14 +31,14 @@ RUN if [ "$RUST_VERSION" ]; then \
 # Install the wasm32-unknown-unknown target
 RUN rustup target add wasm32-unknown-unknown
 
-# Define the version argument for soroban-cli with a default value
-ARG SOROBAN_CLI_VERSION=""
+# Define the version argument for stellar-cli with a default value
+ARG STELLAR_CLI_VERSION=""
 
-# Install soroban-cli 
-RUN if [ -z "$SOROBAN_CLI_VERSION" ]; then \
-         cargo install --locked soroban-cli --features opt; \
+# Install stellar-cli 
+RUN if [ -z "$STELLAR_CLI_VERSION" ]; then \
+         cargo install --locked stellar-cli --features opt; \
        else \
-         cargo install --locked soroban-cli --features opt --version $SOROBAN_CLI_VERSION; \
+         cargo install --locked stellar-cli --features opt --version $STELLAR_CLI_VERSION; \
        fi
 
 # Print the version of rustc
@@ -47,8 +47,8 @@ RUN rustc --version
 # Print the version of cargo
 RUN cargo --version
 
-# Print the version of soroban-cli
-RUN soroban --version
+# Print the version of stellar-cli
+RUN stellar --version
 
 # Specify the package to build
 ENV PACKAGE=${PACKAGE}
