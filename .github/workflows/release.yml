@@ -175,4 +175,3 @@ jobs:
         with:
           subject-path: '${{ env.BUILD_DIR_PATH }}/compilation_workflow_release/${{ env.WASM_FILE_NAME }}'
           subject-name: '${{ env.WASM_FILE_NAME }}'
-          push-to-registry: true
