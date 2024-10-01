@@ -30,6 +30,11 @@ on:
 
 jobs:
   build:
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
+      
     runs-on: ubuntu-latest 
     steps:
       - name: Set directory names and paths
@@ -163,3 +168,11 @@ jobs:
           RELATIVE_PATH: ${{ inputs.relative_path }}
           PACKAGE_NAME: ${{ inputs.package }}
           MAKE_TARGET: ${{ inputs.make_target }}
+      
+
+      - name: Attest
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: '${{ env.BUILD_DIR_PATH }}/compilation_workflow_release/${{ env.WASM_FILE_NAME }}'
+          subject-name: '${{ env.WASM_FILE_NAME }}'
+          push-to-registry: true
