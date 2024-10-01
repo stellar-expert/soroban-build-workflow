@@ -28,12 +28,13 @@ on:
         description: 'Github token'
         required: true
 
+permissions:
+  id-token: write
+  contents: write
+  attestations: write
+
 jobs:
   build:
-    permissions:
-      id-token: write
-      contents: write
-      attestations: write
       
     runs-on: ubuntu-latest 
     steps:
