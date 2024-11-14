@@ -58,7 +58,7 @@ jobs:
 
       - name: Run docker container
         working-directory: ${{ env.BUILD_DIR_PATH }}
-        run: docker run --rm -e RELATIVE_PATH=${{ inputs.relative_path }} -e MAKE_TARGET=${{ inputs.make_target }} -e PACKAGE=${{ inputs.package }} -v "${{ env.BUILD_DIR_PATH }}:/inspector/home" ghcr.io/stellar-expert/soroban-build-workflow:v21.5.0
+        run: docker run --rm -e RELATIVE_PATH=${{ inputs.relative_path }} -e MAKE_TARGET=${{ inputs.make_target }} -e PACKAGE=${{ inputs.package }} -e REPO=github:${{github.event.repository.full_name}} -v "${{ env.BUILD_DIR_PATH }}:/inspector/home" ghcr.io/stellar-expert/soroban-build-workflow:v21.5.0
 
       - name: Get compilation info
         working-directory: ${{ env.BUILD_DIR_PATH }}

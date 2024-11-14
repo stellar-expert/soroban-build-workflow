@@ -29,6 +29,12 @@ if [ "$MAKE_TARGET" ]; then
     fi
 fi
 
+# Check if repo is defined
+if [ ! "$REPO" ]; then
+    echo "ERROR: REPO is not defined"
+    exit 1
+fi
+
 # Print Rust version
 rustc --version
 
@@ -59,13 +65,13 @@ fi
 
 # Check if the PACKAGE is defined add it to the build command
 if [ "$PACKAGE" ]; then
-    stellar contract build --package $PACKAGE --out-dir ${OUTPUT}
+    stellar contract build --package $PACKAGE --out-dir ${OUTPUT} --meta source_repo=$REPO
     # Set the package name to the provided package name
     PACKAGE_NAME=$PACKAGE
 else
     # Get the package name from the Cargo.toml file
     PACKAGE_NAME=$(grep -m1 '^name =' Cargo.toml | cut -d '"' -f2)
-    stellar contract build --out-dir ${OUTPUT}
+    stellar contract build --out-dir ${OUTPUT} --meta source_repo=$REPO
 fi
 
 # Verify that the build was successful

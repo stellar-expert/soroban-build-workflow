@@ -59,6 +59,9 @@ ENV MAKE_TARGET=${MAKE_TARGET}
 # Specify the working directory
 ENV RELATIVE_PATH=${RELATIVE_PATH}
 
+# Specify the repo
+ENV REPO=${REPO}
+
 # Copy entrypoint script
 COPY /entrypoint.sh /usr/local/bin/
 
