@@ -26,6 +26,8 @@ The workflow expects the following inputs in the `with` section:
 - `package` (optional) - package name to build, builds contract in working directory by default
 - `relative_path` (optional) - relative path to the contract source directory, defaults to the repository root directory
 - `make_target` (optional) - make target to invoke, empty by default (useful for contracts with dependencies that must be built before the main contract)
+- `release_description` (optional) - release description
+- `home_domain` (optional) - home domain for the contract
 
 ### Basic workflow for the reporisotry with a single contract
 
@@ -47,6 +49,7 @@ jobs:
     with:
       release_name: ${{ github.ref_name }}          # use git tag as unique release name
       release_description: 'Contract release'       # some boring placeholder text to attach
+      home_domain: 'awesome.com'                    # home domain for the contract
       relative_path: '["src/my-awesome-contract"]'  # relative path to your really awesome contract
       package: 'my-awesome-contract'                # package name to build
       make_target: 'build-dependencies'             # make target to invoke

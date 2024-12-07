@@ -63,15 +63,18 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# If the HOME_DOMAIN is set, set it to home_domain=HOME_DOMAIN, otherwise set it to an empty string
+HOME_DOMAIN=${HOME_DOMAIN:+"--meta home_domain=$HOME_DOMAIN"}
+
 # Check if the PACKAGE is defined add it to the build command
 if [ "$PACKAGE" ]; then
-    stellar contract build --package $PACKAGE --out-dir ${OUTPUT} --meta source_repo=$REPO
+    stellar contract build --package $PACKAGE --out-dir ${OUTPUT} --meta source_repo=$REPO $HOME_DOMAIN
     # Set the package name to the provided package name
     PACKAGE_NAME=$PACKAGE
 else
     # Get the package name from the Cargo.toml file
     PACKAGE_NAME=$(grep -m1 '^name =' Cargo.toml | cut -d '"' -f2)
-    stellar contract build --out-dir ${OUTPUT} --meta source_repo=$REPO
+    stellar contract build --out-dir ${OUTPUT} --meta source_repo=$REPO $HOME_DOMAIN
 fi
 
 # Verify that the build was successful

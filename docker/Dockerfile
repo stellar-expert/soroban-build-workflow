@@ -62,6 +62,9 @@ ENV RELATIVE_PATH=${RELATIVE_PATH}
 # Specify the repo
 ENV REPO=${REPO}
 
+# Specify home domain
+ENV HOME_DOMAIN=${HOME_DOMAIN}
+
 # Copy entrypoint script
 COPY /entrypoint.sh /usr/local/bin/
 
