@@ -74,7 +74,7 @@ jobs:
         working-directory: ${{ env.WORK_DIR }}
         run: |
           rustup update
-          rustup target add wasm32-unknown-unknown
+          rustup target add wasm32v1-none
 
       - name: Print versions
         run: |
@@ -101,9 +101,9 @@ jobs:
           echo "OUTPUT=$OUTPUT" >> $GITHUB_ENV
 
       - name: Build contract
-        uses: stellar/stellar-cli@v22.2.0
+        uses: stellar/stellar-cli@v22.8.1
         with:
-          version: '22.2.0'
+          version: '22.8.1'
       - run: |
           # Navigate to the working directory
           cd ${WORK_DIR}
@@ -189,6 +189,60 @@ jobs:
             --title "${{ env.TAG_NAME }}" \
             --notes "${{ inputs.release_description }}"
         shell: bash
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14'
+  
+      - name: Build output
+        run: |
+            JSON_OUTPUT=$(node -e "console.log(JSON.stringify({ 
+              wasm: process.env.WASM, 
+              hash: process.env.HASH, 
+              relPath: (process.env.REL_PATH || undefined), 
+              package: (process.env.PACKAGE || undefined), 
+              make: (process.env.MAKE || undefined)
+            }))")
+            echo "WASM_OUTPUT='$JSON_OUTPUT'" >> $GITHUB_ENV
+        env:
+          REL_PATH: ${{ inputs.relative_path }}
+          PACKAGE: ${{ inputs.package }}
+          MAKE: ${{ inputs.make_target }}
+          HASH: ${{ env.WASM_HASH }}
+          WASM: ${{ env.WASM_FILE_NAME }}
+
+      - name: Output WASM ${{ env.WASM_OUTPUT }}
+        run: echo ${{ env.WASM_OUTPUT }}
+
+      - name: Send release info
+        run: |
+          JSON_OBJECT=$(node -e "console.log(JSON.stringify({
+            repository: process.env.REPOSITORY,
+            commitHash: process.env.COMMIT_HASH,
+            jobId: process.env.JOB_ID,
+            runId: process.env.RUN_ID,
+            contractHash: process.env.CONTRACT_HASH,
+            relativePath: process.env.RELATIVE_PATH || undefined,
+            packageName: process.env.PACKAGE_NAME || undefined,
+            makeTarget: process.env.MAKE_TARGET || undefined
+          }))")
+      
+          echo "JSON to send: $JSON_OBJECT"
+      
+          curl -X POST "https://api.stellar.expert/explorer/public/contract-validation/match" \
+               -H "Content-Type: application/json" \
+               -d "$JSON_OBJECT" \
+               --max-time 15
+        env:
+          REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT_HASH: ${{ github.sha }}
+          JOB_ID: ${{ github.job }}
+          RUN_ID: ${{ github.run_id }}
+          CONTRACT_HASH: ${{ env.WASM_HASH }}
+          RELATIVE_PATH: ${{ inputs.relative_path }}
+          PACKAGE_NAME: ${{ inputs.package }}
+          MAKE_TARGET: ${{ inputs.make_target }}
 
       - name: Attest
         uses: actions/attest-build-provenance@v1
