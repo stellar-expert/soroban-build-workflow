@@ -120,19 +120,6 @@ jobs:
             COMMAND_ARGS="$COMMAND_ARGS --meta home_domain=${{ inputs.home_domain }}"
           fi
 
-          # Build info
-          BUILD_INFO=$(jq -n \
-            --arg package "${{ inputs.package }}" \
-            --arg make_target "${{ inputs.make_target }}" \
-            --arg relative_path "${{ inputs.relative_path }}" \
-            '{package: $package, make_target: $make_target, relative_path: $relative_path}
-            | with_entries(select(.value != ""))')
-
-          # Convert to JSON string
-          BUILD_INFO=$(echo "$BUILD_INFO" | jq -c .)
-
-          COMMAND_ARGS="$COMMAND_ARGS --meta build_info=$BUILD_INFO"
-
           # Build the contract
           stellar contract build $COMMAND_ARGS
 
