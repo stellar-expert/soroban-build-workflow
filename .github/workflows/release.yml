@@ -42,83 +42,140 @@ jobs:
       
     runs-on: ubuntu-latest 
     steps:
-      - name: Set directory names and paths
+      - name: Set working directory
         run: |
-          build_dir_name="build_"$(openssl rand -base64 8 | tr -d '/+=' | head -c 8)
-          echo "BUILD_DIR_NAME=$build_dir_name" >> $GITHUB_ENV
-          echo "BUILD_DIR_PATH=${{ github.workspace }}/$build_dir_name" >> $GITHUB_ENV
-
-      - name: Verify that checkout directory doesn't exist
-        run: |
-          if [[ -d ${{ env.BUILD_DIR_PATH }} ]]; then
-            echo "Directory ${{ env.BUILD_DIR_PATH }} already exists"
-            exit 1
-          fi
+          RANDOM_DIR=$(openssl rand -hex 8)
+          WORK_DIR="${{ github.workspace }}/$RANDOM_DIR"
+          mkdir -p "$WORK_DIR"
+          echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+          echo "Using working directory: $WORK_DIR"
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          path: ${{ env.BUILD_DIR_NAME }}
-
-      - name: Run docker container
-        working-directory: ${{ env.BUILD_DIR_PATH }}
-        run: docker run --rm -e RELATIVE_PATH=${{ inputs.relative_path }} -e MAKE_TARGET=${{ inputs.make_target }} -e PACKAGE=${{ inputs.package }} -e REPO=github:${{github.event.repository.full_name}} -e HOME_DOMAIN=${{inputs.home_domain}} -v "${{ env.BUILD_DIR_PATH }}:/inspector/home" ghcr.io/stellar-expert/soroban-build-workflow:v22.0.1
-
-      - name: Get compilation info
-        working-directory: ${{ env.BUILD_DIR_PATH }}
+          path: ${{ env.WORK_DIR }}
+      
+      - name: Set relative path
         run: |
-          # Compilation info JSON file
-          JSON_FILE="${BUILD_DIR_PATH}/compilation_workflow_release/compilation_info.json"
+          # Set relative path after checking out the code
+          if [ "${{ inputs.relative_path }}" ]; then
+            WORK_DIR="$WORK_DIR/${{ inputs.relative_path }}"
+            echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+            echo "Using relative path: $WORK_DIR"
+          fi
+      
+      - name: Run Make (if applicable)
+        if: inputs.make_target != ''
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          make ${{ inputs.make_target }}
 
-          # Check if the file exists
-          if [ -f "$JSON_FILE" ]; then
-              # Read the JSON file
-              json=$(cat "$JSON_FILE")
-          
-              # Parse values from JSON using native Bash commands
-              PACKAGE_NAME=$(echo "$json" | grep -oP '"packageName": "\K[^"]+')
-              PACKAGE_VERSION=$(echo "$json" | grep -oP '"packageVersion": "\K[^"]+')
-              CLI_VERSION=$(echo "$json" | grep -oP '"cliVersion": "\K[^"]+')
-              WASM_FILE_NAME=$(echo "$json" | grep -oP '"wasmFileName": "\K[^"]+')
-              WASM_HASH=$(echo "$json" | grep -oP '"wasmHash": "\K[^"]+')
-          
-              # Set environment variables using 'echo' to be picked up by GitHub Actions
-              echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
-              echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
-              echo "CLI_VERSION=$CLI_VERSION" >> $GITHUB_ENV
-              echo "WASM_FILE_NAME=$WASM_FILE_NAME" >> $GITHUB_ENV
-              echo "WASM_HASH=$WASM_HASH" >> $GITHUB_ENV
+      - name: Update Rust and Add wasm32 Target
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          rustup update
+          rustup target add wasm32v1-none
+
+      - name: Print versions
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Get Cargo.toml metadata
+        working-directory: ${{ env.WORK_DIR }}
+        run: |
+          if [ ! -f "Cargo.toml" ]; then
+            echo "Cargo.toml does not exist"
+            exit 1
+          fi
+          CARGO_METADATA=$(cargo metadata --format-version=1 --no-deps)
+          echo "CARGO_METADATA=$CARGO_METADATA" >> $GITHUB_ENV
+
+      - name: Set output directory path
+        run: |
+          RANDOM_DIR=$(openssl rand -hex 8)
+          OUTPUT="$WORK_DIR/$RANDOM_DIR"
+          echo "OUTPUT=$OUTPUT" >> $GITHUB_ENV
+
+      - name: Build contract
+        uses: stellar/stellar-cli@v22.8.1
+        with:
+          version: '22.8.1'
+      - run: |
+          # Navigate to the working directory
+          cd ${WORK_DIR}
+
+          # Build command arguments
+          COMMAND_ARGS="--out-dir ${OUTPUT} --meta source_repo=${{ github.repository }}"
+          if [ "${{ inputs.package }}" ]; then
+              COMMAND_ARGS="--package ${{ inputs.package }} $COMMAND_ARGS"
+              PACKAGE_NAME=${{ inputs.package }}
           else
-              echo "The JSON file $JSON_FILE does not exist."
+              PACKAGE_NAME=$(grep -m1 '^name =' Cargo.toml | cut -d '"' -f2)
+          fi
+          if [ "${{ inputs.home_domain }}" ]; then
+            COMMAND_ARGS="$COMMAND_ARGS --meta home_domain=${{ inputs.home_domain }}"
+          fi
+
+          # Build the contract
+          stellar contract build $COMMAND_ARGS
+
+          # Get the package version
+          PACKAGE_VERSION=$(echo "$CARGO_METADATA" | jq '.packages[] | select(.name == "'"${PACKAGE_NAME}"'") | .version' | sed -e 's/"//g')
+          if [ -z "$PACKAGE_VERSION" ]; then
+              echo "ERROR: Failed to get the package version"
               exit 1
           fi
+
+          # Build the wasm file name
+          WASM_FILE_NAME="${PACKAGE_NAME}_v${PACKAGE_VERSION}.wasm"
+
+          # Navigate to the output directory
+          cd ${OUTPUT}
+
+          # Find the .wasm file and copy it as unoptimized.wasm for hash calculation
+          find ${OUTPUT} -name "*.wasm" -exec cp {} ${WASM_FILE_NAME} \;
+          stellar contract optimize --wasm ${WASM_FILE_NAME} --wasm-out ${WASM_FILE_NAME}
+
+          # Calculate the hash of the wasm file
+          WASM_HASH=$(sha256sum $WASM_FILE_NAME | cut -d ' ' -f 1)
+          
+          # Set environment variables
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+          echo "WASM_FILE_NAME=$WASM_FILE_NAME" >> $GITHUB_ENV
+          echo "WASM_HASH=$WASM_HASH" >> $GITHUB_ENV
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> $GITHUB_ENV
+          echo "BUILD_INFO=$BUILD_INFO" >> $GITHUB_ENV
       
       - name: Build release name
         run: |
+          CLI_VERSION=$(stellar --version | grep -oP 'stellar \K\S+')
           if [ -n "${{ inputs.relative_path }}" ]; then
             relative_path=$(echo "_${{ inputs.relative_path }}" | sed 's/\W\+/_/g')
           fi
 
           # Check if the release_name input is equal to PACKAGE_VERSION
-          if [ "${{ inputs.release_name }}" != "${{ env.PACKAGE_VERSION }}" ] && [ "${{ inputs.release_name }}" != "v${{ env.PACKAGE_VERSION }}" ]; then
-            pkg_version="_pkg${{ env.PACKAGE_VERSION }}"
+          if [ "${{ inputs.release_name }}" != "${PACKAGE_VERSION}" ] && [ "${{ inputs.release_name }}" != "v${PACKAGE_VERSION}" ]; then
+            pkg_version="_pkg${PACKAGE_VERSION}"
           else
             pkg_version=""
           fi
 
-          tag_name="${{ inputs.release_name }}${relative_path}_${{ env.PACKAGE_NAME }}${pkg_version}_cli${{ env.CLI_VERSION }}"
-          echo "TAG_NAME=$tag_name" >> $GITHUB_ENV
+          TAG_NAME="${{ inputs.release_name }}${relative_path}_${PACKAGE_NAME}${pkg_version}_cli${CLI_VERSION}"
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
         
       - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          draft: false
-          prerelease: false
-          body: ${{ inputs.release_description }}
-          files: '${{ env.BUILD_DIR_PATH }}/compilation_workflow_release/${{ env.WASM_FILE_NAME }}'
-          token: ${{ secrets.release_token }}
-
+        working-directory: ${{ env.OUTPUT }}
+        env:
+          GH_TOKEN: ${{ secrets.release_token }}
+        run: |
+          gh release create "${{ env.TAG_NAME }}" "${{ env.OUTPUT }}/${{ env.WASM_FILE_NAME }}" \
+            --title "${{ env.TAG_NAME }}" \
+            --notes "${{ inputs.release_description }}"
+        shell: bash
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -173,10 +230,9 @@ jobs:
           RELATIVE_PATH: ${{ inputs.relative_path }}
           PACKAGE_NAME: ${{ inputs.package }}
           MAKE_TARGET: ${{ inputs.make_target }}
-      
 
       - name: Attest
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: '${{ env.BUILD_DIR_PATH }}/compilation_workflow_release/${{ env.WASM_FILE_NAME }}'
+          subject-path: '${{ env.OUTPUT }}/${{ env.WASM_FILE_NAME }}'
           subject-name: '${{ env.WASM_FILE_NAME }}'
