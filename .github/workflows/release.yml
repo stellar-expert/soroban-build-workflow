@@ -109,7 +109,7 @@ jobs:
           cd ${WORK_DIR}
 
           # Build command arguments
-          COMMAND_ARGS="--out-dir ${OUTPUT} --meta source_repo=${{ github.repository }}"
+          COMMAND_ARGS="--out-dir ${OUTPUT} --meta source_repo=github:${{ github.repository }}"
           if [ "${{ inputs.package }}" ]; then
               COMMAND_ARGS="--package ${{ inputs.package }} $COMMAND_ARGS"
               PACKAGE_NAME=${{ inputs.package }}
