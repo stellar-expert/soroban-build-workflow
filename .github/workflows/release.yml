@@ -121,7 +121,7 @@ jobs:
           fi
 
           # Build the contract
-          stellar contract build --optimize --$COMMAND_ARGS
+          stellar contract build --optimize $COMMAND_ARGS
 
           # Get the package version
           PACKAGE_VERSION=$(echo "$CARGO_METADATA" | jq '.packages[] | select(.name == "'"${PACKAGE_NAME}"'") | .version' | sed -e 's/"//g')
